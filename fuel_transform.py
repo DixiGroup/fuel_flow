@@ -1,7 +1,7 @@
 import csv
 import xlrd
 import xlsxwriter
-import datetime
+from datetime import datetime
 import os
 import sys
 import re
@@ -30,13 +30,8 @@ def load_workbook(wb):
             year = re.search("\d{4}", cellvalue).group()
             date = ".".join([day, month, year])
         else:
-            #print(pp_dict)
-            #print(sheet.cell(i, 0).value)
             if sheet.cell(i, 0).value in pp_dict.keys() and sheet.cell(i, 0).value != "":
                 pp = sheet.cell(i, 0).value
-                print(pp, pp_dict[pp]['plant_name'])
-                #print(pp)
-                #вирівняти кількість рядків      
                 for k in columns_dict.keys():
                     sheet_dict["date"].append(date)
                     sheet_dict['company'].append(pp_dict[pp]['company'])
@@ -69,10 +64,20 @@ def dict_to_list(dict_, headers):
     for i in range(len(dict_[headers[0]])):
         new_l = []
         for h in headers:
-            #print(h, i)
             new_l.append(dict_[h][i])
         l.append(new_l)
     return l
+
+
+if not os.path.exists("fuel_transform.log"):
+    f = open("fuel_transform.log", "w")
+    f.close()
+f = open("fuel_transform.log", "a")
+sys.stdout = f
+sys.stderr = f
+
+print("----------------")
+print(datetime.now())
 
 with open(STAIONS_FILE, "r") as sf:
     pp_reader = csv.reader(sf)
@@ -99,15 +104,6 @@ for l in lines:
     if not columns_dict.get(str(l[2])):
         columns_dict[str(l[2])] = {}
     columns_dict[str(l[2])][l[1]] = l[0]    
-    """if not columns_dict[str(l[0])].get(l[2]):
-        columns_dict[str(l[0])][l[2]] = {}
-
-        columns_dict[str(l[0])][l[2]] = [l[1]]
-    else:
-        columns_dict[str(l[0])][l[2]].append(l[1])
-    columns_dict[str(l[0])]['value_type'] = l[1]
-    columns_dict[str(l[0])]['fuel_type'] = l[2]"""
-print(columns_dict)
 files = os.listdir(INPUT_FOLDER_1)
 files = [f for f in files if f.endswith(".xls")]
 fuel_dict = {}
@@ -120,19 +116,13 @@ for f in files:
     else:
         for k in fuel_dict.keys():
             fuel_dict[k] += file_dict[k]
-print(fuel_dict)
 #сюди треба додати коди станцій, коли буде існувати довідник
 fuel_dict["plant_code"] = [""] * len(fuel_dict[HEADERS[0]])
 plan_dict = add_coal_plan.main()
-print(plan_dict)
-#print(plan_dict["29.07.2018"])
 for i in range(len(fuel_dict[HEADERS[0]])):
-    #print(fuel_dict['date'][i], fuel_dict['plant_name'][i], fuel_dict['fuel_type'][i])
     plan = plan_dict.get(fuel_dict['date'][i], {}).get(fuel_dict['plant_name'][i], {}).get(fuel_dict['fuel_type'][i],"")
     fuel_dict['reserve_plan'].append(plan)
-    #print(plan)
-#print(len(fuel_dict['income']), len(fuel_dict['reserve_fact']), len(fuel_dict['spend']))
-fuel_dict['date'] = list(map(lambda x: datetime.datetime.strptime(x, "%d.%m.%Y"), fuel_dict["date"]))
+fuel_dict['date'] = list(map(lambda x: datetime.strptime(x, "%d.%m.%Y"), fuel_dict["date"]))
 date_to_filename = max(fuel_dict['date']).strftime("%d_%m_%Y")
 filename = os.path.join(OUTPUT_FOLDER, FILENAME_TEMPLATE.format(date = date_to_filename))
 coal_list = dict_to_list(fuel_dict, HEADERS)
@@ -142,7 +132,7 @@ with open(filename + ".csv", "w", newline="") as cfile:
     csvwriter.writerow(HEADERS)
     for i in range(len(coal_list)):
         l = coal_list[i][:]
-        l[0] = datetime.datetime.strftime(l[0],"%d.%m.%Y")
+        l[0] = datetime.strftime(l[0],"%d.%m.%Y")
         csvwriter.writerow(l)
 out_wb = xlsxwriter.Workbook(filename + ".xlsx")
 worksheet = out_wb.add_worksheet()
@@ -160,3 +150,6 @@ for i in range(len(coal_list)):
         else:
             worksheet.write(i+1, j, coal_list[i][j])
 out_wb.close()      
+
+print("No errors were caught")
+print("-----------------")
